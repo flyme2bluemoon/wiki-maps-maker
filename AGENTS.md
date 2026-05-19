@@ -8,6 +8,10 @@ Instructions for AI coding agents working in this repository.
 - Use Tailwind CSS for styling when the project supports Tailwind.
 - Use `pnpm` for package management.
 
+## Security
+
+- Never inject fetched SVG markup directly into the DOM. Always sanitize with DOMPurify (using the `svg` and `svgFilters` profiles) before injection to prevent XSS via malicious `<script>` tags, `on*` event attributes, or external resource references embedded in SVG files.
+
 ## Workflow
 
 - Before starting a dev server, check whether one is already running. Reuse the existing server when possible.
