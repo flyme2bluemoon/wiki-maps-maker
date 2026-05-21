@@ -113,18 +113,137 @@ function lerpOklch(a: string, b: string, t: number): string {
 // CSS / defs builders
 // ---------------------------------------------------------------------------
 
+interface MarkerCircle {
+  cx: number;
+  cy: number;
+  r: number;
+  className: string;
+}
+
+const MARKER_CLASSES = ['circlexx', 'subxx', 'noxx', 'unxx'] as const;
+
+function readSvgAttr(tag: string, name: string): string | null {
+  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`));
+  return match?.[1] ?? null;
+}
+
+function collectMarkerCirclesByClass(svg: string): Map<string, MarkerCircle[]> {
+  const circlesByClass = new Map<string, MarkerCircle[]>();
+  const circleRe = /<circle\b[^>]*>/g;
+
+  for (const match of svg.matchAll(circleRe)) {
+    const tag = match[0];
+    const className = readSvgAttr(tag, 'class') ?? '';
+    const classes = className.split(/\s+/).filter(Boolean);
+    if (!MARKER_CLASSES.some(markerClass => classes.includes(markerClass))) {
+      continue;
+    }
+
+    const cx = Number(readSvgAttr(tag, 'cx'));
+    const cy = Number(readSvgAttr(tag, 'cy'));
+    const r = Number(readSvgAttr(tag, 'r'));
+    if (![cx, cy, r].every(Number.isFinite)) continue;
+
+    const circle = { cx, cy, r, className };
+    for (const classToken of classes) {
+      if (MARKER_CLASSES.includes(classToken as (typeof MARKER_CLASSES)[number])) {
+        continue;
+      }
+
+      if (!circlesByClass.has(classToken)) circlesByClass.set(classToken, []);
+      circlesByClass.get(classToken)!.push(circle);
+    }
+  }
+
+  return circlesByClass;
+}
+
+function fmtSvgNumber(value: number): string {
+  return Number(value.toFixed(4)).toString();
+}
+
+function buildPieSlicePath(
+  cx: number,
+  cy: number,
+  r: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const startX = cx + r * Math.cos(startAngle);
+  const startY = cy + r * Math.sin(startAngle);
+  const endX = cx + r * Math.cos(endAngle);
+  const endY = cy + r * Math.sin(endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+
+  return [
+    `M ${fmtSvgNumber(cx)} ${fmtSvgNumber(cy)}`,
+    `L ${fmtSvgNumber(startX)} ${fmtSvgNumber(startY)}`,
+    `A ${fmtSvgNumber(r)} ${fmtSvgNumber(r)} 0 ${largeArc} 1 ${fmtSvgNumber(endX)} ${fmtSvgNumber(endY)}`,
+    'Z',
+  ].join(' ');
+}
+
+function markerStrokeWidth(className: string): string {
+  return /\b(?:subxx|unxx)\b/.test(className) ? '0.3' : '0.5';
+}
+
+function buildMarkerPie(circle: MarkerCircle, colors: string[]): string {
+  const step = (Math.PI * 2) / colors.length;
+  const start = -Math.PI / 2;
+  const slices = colors
+    .map((color, i) => {
+      const d = buildPieSlicePath(circle.cx, circle.cy, circle.r, start + i * step, start + (i + 1) * step);
+      return `<path d="${d}" fill="${color}"/>`;
+    })
+    .join('');
+
+  return (
+    `<g class="wmm-marker-pie">` +
+    slices +
+    `<circle cx="${fmtSvgNumber(circle.cx)}" cy="${fmtSvgNumber(circle.cy)}" r="${fmtSvgNumber(circle.r)}" ` +
+    `fill="none" stroke="#000000" stroke-width="${markerStrokeWidth(circle.className)}"/>` +
+    `</g>`
+  );
+}
+
+function buildMarkerPieOverlay(
+  countryColors: Map<string, string[]>,
+  markerCirclesByClass: Map<string, MarkerCircle[]>,
+): string {
+  const pies: string[] = [];
+
+  for (const [id, colors] of countryColors) {
+    if (colors.length < 2) continue;
+
+    const markerCircles = markerCirclesByClass.get(id);
+    if (!markerCircles) continue;
+
+    for (const circle of markerCircles) {
+      pies.push(buildMarkerPie(circle, colors));
+    }
+  }
+
+  if (!pies.length) return '';
+  return `<g class="wmm-marker-pies">\n${pies.join('\n')}\n</g>`;
+}
+
 /**
- * Build CSS rules and optional stripe-pattern `<defs>` for groups mode.
+ * Build CSS rules, optional stripe-pattern `<defs>`, and optional pie overlays
+ * for groups mode.
  *
  * - Countries in exactly one group → solid fill.
  * - Countries in multiple groups → diagonal stripe pattern, one band per
  *   group colour in group order.
+ * - Small-country and small-territory circle markers in multiple groups → pie
+ *   chart slices, one equal slice per group colour.
  *
- * `opacity: 1` is always set so that tiny countries represented as hidden
- * circle markers (`.circlexx`, opacity: 0 by default) become visible when
- * assigned a colour.
+ * `opacity: 1` is always set so that tiny places represented as hidden circle
+ * markers become visible when assigned a colour.
  */
-export function buildGroupResult(groups: Group[]): { defs: string; css: string } {
+export function buildGroupResult(
+  groups: Group[],
+  baseSvg = '',
+): { defs: string; css: string; markerOverlay: string } {
   // countryId → ordered list of fill colours (one entry per group membership)
   const countryColors = new Map<string, string[]>();
   for (const g of groups) {
@@ -137,6 +256,7 @@ export function buildGroupResult(groups: Group[]): { defs: string; css: string }
 
   const patternDefs: string[] = [];
   const cssRules: string[] = [];
+  const markerCirclesByClass = baseSvg ? collectMarkerCirclesByClass(baseSvg) : new Map<string, MarkerCircle[]>();
 
   for (const [id, colors] of countryColors) {
     if (colors.length === 1) {
@@ -156,6 +276,10 @@ export function buildGroupResult(groups: Group[]): { defs: string; css: string }
           `</pattern>`,
       );
       cssRules.push(`.${id} { fill: url(#${patternId}); opacity: 1; }`);
+      if (markerCirclesByClass.has(id)) {
+        const markerSelectors = MARKER_CLASSES.map(markerClass => `circle.${id}.${markerClass}`).join(', ');
+        cssRules.push(`${markerSelectors} { fill: none; opacity: 1; }`);
+      }
     }
   }
 
@@ -163,7 +287,11 @@ export function buildGroupResult(groups: Group[]): { defs: string; css: string }
     patternDefs.length > 0
       ? `<defs>\n${patternDefs.join('\n')}\n</defs>`
       : '';
-  return { defs, css: cssRules.join('\n') };
+  return {
+    defs,
+    css: cssRules.join('\n'),
+    markerOverlay: buildMarkerPieOverlay(countryColors, markerCirclesByClass),
+  };
 }
 
 /**
@@ -331,9 +459,9 @@ export function buildWorldMapSvg(baseSvg: string, opts: BuildOpts): string {
       legendOverlay = buildGradientLegend(range, gradDefId);
     }
   } else {
-    const { defs, css: groupCss } = buildGroupResult(groups);
+    const { defs, css: groupCss, markerOverlay } = buildGroupResult(groups, baseSvg);
     css = groupCss;
-    extraDefs = defs;
+    extraDefs = [defs, markerOverlay].filter(Boolean).join('\n');
     if (includeOverlay) {
       legendOverlay = buildGroupsLegend(groups);
     }
