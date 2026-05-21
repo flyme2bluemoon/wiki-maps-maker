@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import {
-  UN_COUNTRIES, SUBDIVISIONS, GROUP_COLORS,
+  WORLD_MAP_TARGETS, SUBDIVISIONS, GROUP_COLORS,
   byContinent, countryById, continentById,
 } from '../data/mapData';
 import { GroupCard } from './GroupCard';
@@ -57,9 +57,11 @@ export function ConfigPanel(props: Props) {
 
   const targets = useMemo(() => {
     if (mode === 'world') {
-      return UN_COUNTRIES.map(c => ({
-        id: c.id, label: c.name,
-        sub: continentById(c.continent)?.name ?? '—',
+      return WORLD_MAP_TARGETS.map(target => ({
+        id: target.id, label: target.name,
+        sub: target.group,
+        aliases: target.aliases,
+        searchText: target.searchText,
       }));
     } else if (mode === 'continent') {
       return byContinent(continentId).map(c => ({ id: c.id, label: c.name, sub: 'Country' }));
@@ -69,8 +71,14 @@ export function ConfigPanel(props: Props) {
     return sd.regions.map(r => ({ id: r, label: r, sub: 'Region' }));
   }, [mode, continentId, countryId]);
 
-  const targetNoun = mode === 'country' ? 'regions' : 'countries';
-  const targetNounSingular = mode === 'country' ? 'region' : 'country';
+  const targetNoun =
+    mode === 'world' ? 'map items' :
+    mode === 'country' ? 'regions' :
+    'countries';
+  const targetNounSingular =
+    mode === 'world' ? 'map item' :
+    mode === 'country' ? 'region' :
+    'country';
 
   function nextColorId() {
     const used = new Set(groups.map(g => g.colorId));

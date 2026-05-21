@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  UN_COUNTRIES, GRADIENT_ENDPOINTS, GRADIENT_PRESETS,
-  continentById, gradientColorById, parseGradientNumber, scaleRange, fmtNum,
+  WORLD_MAP_TARGETS, GRADIENT_ENDPOINTS, GRADIENT_PRESETS,
+  gradientColorById, parseGradientNumber, scaleRange, fmtNum,
+  filterAndSortMapTargets,
 } from '../data/mapData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,7 @@ export function GradientConfig({
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
-  function addCountry(id: string) {
+  function addTarget(id: string) {
     if (values[id] !== undefined) return;
     setValues({ ...values, [id]: 0 });
     setSearch(''); setPicking(false);
@@ -56,16 +57,14 @@ export function GradientConfig({
       setValues({ ...values, [id]: raw });
     }
   }
-  function removeCountry(id: string) {
+  function removeTarget(id: string) {
     const next = { ...values }; delete next[id]; setValues(next);
   }
 
   const taken = new Set(ids);
-  const available = UN_COUNTRIES.filter(
-    c => !taken.has(c.id) && c.name.toLowerCase().includes(search.toLowerCase())
-  );
-  const groupedAvailable = available.reduce<Record<string, typeof UN_COUNTRIES>>((acc, c) => {
-    const k = continentById(c.continent)?.name ?? '—';
+  const available = filterAndSortMapTargets(WORLD_MAP_TARGETS, search, target => taken.has(target.id));
+  const groupedAvailable = available.reduce<Record<string, typeof WORLD_MAP_TARGETS>>((acc, c) => {
+    const k = c.group;
     (acc[k] = acc[k] ?? []).push(c);
     return acc;
   }, {});
@@ -88,7 +87,7 @@ export function GradientConfig({
           <div className="border border-line rounded-[10px] p-2 bg-paper [box-shadow:0_4px_12px_-6px_oklch(0.2_0.02_240_/_0.12)]" ref={pickerRef}>
             <Input
               className="mb-1.5 text-[12.5px]"
-              placeholder="Search countries…"
+              placeholder="Search map items..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               autoFocus
@@ -96,7 +95,7 @@ export function GradientConfig({
             <div className="max-h-[260px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-line-2 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-track]:bg-transparent">
               {available.length === 0 ? (
                 <div className="py-[18px] px-2 text-center text-[12px] text-ink-3">
-                  {taken.size === UN_COUNTRIES.length ? 'Every country has a value' : 'No matches'}
+                  {taken.size === WORLD_MAP_TARGETS.length ? 'Every map item has a value' : 'No matches'}
                 </div>
               ) : Object.keys(groupedAvailable).map(g => (
                 <div key={g}>
@@ -104,7 +103,7 @@ export function GradientConfig({
                   {groupedAvailable[g].map(c => (
                     <button key={c.id}
                       className="w-full flex items-baseline justify-between gap-2 px-2 py-1.5 rounded-[6px] text-left hover:bg-canvas transition-colors"
-                      onClick={() => addCountry(c.id)}
+                      onClick={() => addTarget(c.id)}
                     >
                       <span className="text-[13px] font-medium">{c.name}</span>
                       <span className="font-mono text-[10px] text-ink-3">{c.id}</span>
@@ -120,7 +119,7 @@ export function GradientConfig({
           <div className="border border-dashed border-line-2 rounded-[10px] px-4 py-[18px] flex flex-col gap-1.5 items-center text-center bg-gradient-to-b from-panel to-canvas">
             <div className="font-serif font-semibold text-[14px]">No data yet</div>
             <div className="text-[12px] text-ink-3 leading-[1.5] max-w-[32ch] mb-1">
-              Add a country and a numeric value. Decimals are fine. Countries without values won't be coloured.
+              Add a map item and a numeric value. Items without values won't be coloured.
             </div>
             <Button variant="default" onClick={() => setPicking(true)}>+ Add your first data point</Button>
           </div>
@@ -128,11 +127,11 @@ export function GradientConfig({
           <>
             <ul className="list-none m-0 p-0 flex flex-col gap-1">
               {ids.map(id => {
-                const country = UN_COUNTRIES.find(c => c.id === id) ?? { name: id, id };
+                const target = WORLD_MAP_TARGETS.find(c => c.id === id) ?? { name: id, id };
                 return (
                   <li key={id} className="grid grid-cols-[32px_1fr_96px_26px] items-center gap-2 px-2 py-1.5 pl-2 rounded-[8px] bg-paper border border-line hover:border-line-2 transition-colors">
                     <span className="font-mono text-[10.5px] text-ink-3 tracking-[0.05em]">{id}</span>
-                    <span className="text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={country.name}>{country.name}</span>
+                    <span className="text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={target.name}>{target.name}</span>
                     <input
                       className="w-full px-2.5 py-1.5 rounded-[6px] border border-line bg-canvas font-mono text-[12.5px] text-right outline-none transition-[border-color,background-color] focus:border-accent focus:bg-paper"
                       type="text"
@@ -143,8 +142,8 @@ export function GradientConfig({
                     />
                     <button
                       className="flex items-center justify-center w-full h-full text-[14px] text-ink-3 hover:text-ink transition-colors"
-                      onClick={() => removeCountry(id)}
-                      aria-label={`Remove ${country.name}`}
+                      onClick={() => removeTarget(id)}
+                      aria-label={`Remove ${target.name}`}
                     >×</button>
                   </li>
                 );
@@ -152,7 +151,7 @@ export function GradientConfig({
             </ul>
             <Button variant="ghost" className="w-full" onClick={() => setPicking(true)}
               disabled={available.length === 0 && !search}>
-              + Add country
+              + Add map item
             </Button>
           </>
         )}

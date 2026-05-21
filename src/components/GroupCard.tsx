@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { GROUP_COLORS, colorById } from '../data/mapData';
+import { GROUP_COLORS, colorById, filterAndSortMapTargets } from '../data/mapData';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import type { Group } from '../types';
 
-interface Target { id: string; label: string; sub: string; }
+interface Target { id: string; label: string; sub: string; aliases?: string[]; searchText?: string; }
 
 interface Props {
   group: Group;
@@ -46,9 +46,7 @@ export function GroupCard({
   }
 
   const memberSet = new Set(group.members);
-  const available = targets.filter(
-    t => !memberSet.has(t.id) && t.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const available = filterAndSortMapTargets(targets, search, t => memberSet.has(t.id));
   const grouped = available.reduce<Record<string, Target[]>>((acc, t) => {
     (acc[t.sub] = acc[t.sub] ?? []).push(t);
     return acc;

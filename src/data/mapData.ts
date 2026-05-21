@@ -17,6 +17,22 @@ export interface UNCountry {
   continent: string;
 }
 
+export interface SearchableMapTarget {
+  id: string;
+  label?: string;
+  name?: string;
+  aliases?: string[];
+  searchText?: string;
+}
+
+export interface WorldMapTarget extends SearchableMapTarget {
+  id: string;
+  name: string;
+  group: string;
+  aliases: string[];
+  searchText: string;
+}
+
 export interface GroupColor {
   id: string;
   value: string;
@@ -263,6 +279,237 @@ export const SUBDIVISIONS: Record<string, { regions: string[] }> = {
   au: { regions: ['Australian Capital Territory','New South Wales','Northern Territory','Queensland','South Australia','Tasmania','Victoria','Western Australia'] },
 };
 
+export const SVG_SELECTABLE_WORLD_IDS = [
+  'ad', 'ae', 'af', 'ag', 'ai', 'al', 'am', 'antxx', 'ao', 'aq', 'ar', 'as',
+  'at', 'au', 'aw', 'az', 'ba', 'bb', 'bd', 'be', 'bf', 'bg', 'bh', 'bi',
+  'bj', 'bl', 'bm', 'bn', 'bo', 'bq', 'br', 'bs', 'bt', 'bw', 'by', 'bz',
+  'ca', 'cc', 'cd', 'cf', 'cg', 'ch', 'ci', 'ck', 'cl', 'cm', 'cn', 'cnx', 'cnxx',
+  'co', 'cr', 'cu', 'cv', 'cw', 'cx', 'cy', 'cz', 'de', 'dj', 'dk', 'dm',
+  'do', 'dz', 'eaeu', 'ec', 'ee', 'eg', 'eh', 'er', 'es', 'et', 'eu', 'fi',
+  'fj', 'fk', 'fm', 'fo', 'fr', 'frx', 'frxx', 'ga', 'gb', 'gd', 'ge', 'gf', 'gg',
+  'gh', 'gi', 'gl', 'gm', 'gn', 'gp', 'gq', 'gr', 'gs', 'gt', 'gu', 'gw',
+  'gy', 'hk', 'hm', 'hn', 'hr', 'ht', 'hu', 'id', 'ie', 'il', 'im', 'in',
+  'io', 'iq', 'ir', 'is', 'it', 'je', 'jm', 'jo', 'jp', 'ke', 'kg', 'kh',
+  'ki', 'km', 'kn', 'kp', 'kr', 'kw', 'ky', 'kz', 'la', 'lb', 'lc', 'li',
+  'lk', 'lr', 'ls', 'lt', 'lu', 'lv', 'ly', 'ma', 'mc', 'md', 'me', 'mf',
+  'mg', 'mh', 'mk', 'ml', 'mm', 'mn', 'mo', 'mp', 'mq', 'mr', 'ms', 'mt',
+  'mu', 'mv', 'mw', 'mx', 'my', 'mz', 'na', 'nc', 'ne', 'nf', 'ng', 'ni',
+  'nl', 'nlx', 'nlxx', 'no', 'noxx', 'np', 'nr', 'nu', 'nz', 'oceanxx', 'om', 'pa', 'pe',
+  'pf', 'pg', 'ph', 'pk', 'pl', 'pm', 'pn', 'pr', 'ps', 'pt', 'pw', 'py',
+  'qa', 're', 'ro', 'rs', 'ru', 'rw', 'sa', 'sb', 'sc', 'sd', 'se', 'sg',
+  'sh', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sr', 'ss', 'st', 'sv', 'sx',
+  'sy', 'sz', 'tc', 'td', 'tf', 'tg', 'th', 'tj', 'tk', 'tl', 'tm', 'tn',
+  'to', 'tr', 'tt', 'tv', 'tw', 'tz', 'ua', 'ug', 'us', 'uy', 'uz', 'va',
+  'vc', 've', 'vg', 'vi', 'vn', 'vu', 'wf', 'ws', 'xa', 'xc', 'xd', 'xj',
+  'xk', 'xl', 'xn', 'xo', 'xp', 'xq', 'xr', 'xs', 'xv', 'xz', 'ye', 'yt',
+  'za', 'zm', 'zw',
+] as const;
+
+const WORLD_TARGET_NAME_OVERRIDES: Record<string, string> = {
+  antxx: 'All unpopulated areas',
+  noxx: 'Unpopulated area locator circles',
+  oceanxx: 'Oceans, seas, and large lakes',
+  eu: 'European Union',
+  eaeu: 'Eurasian Economic Union',
+  cnx: 'Mainland China',
+  cnxx: 'Chinese SAR locator circles',
+  frx: 'Metropolitan France',
+  frxx: 'French overseas department locator circles',
+  nlx: 'European Netherlands',
+  nlxx: 'Caribbean Netherlands locator circles',
+  xa: 'Abkhazia',
+  xc: 'Northern Cyprus',
+  xd: "Donetsk People's Republic",
+  xj: 'Azad Jammu and Kashmir',
+  xk: 'Kosovo',
+  xl: "Luhansk People's Republic",
+  xn: 'Artsakh',
+  xo: 'South Ossetia',
+  xp: 'Transnistria',
+  xq: 'Crimea',
+  xr: 'Southern Kuril Islands',
+  xs: 'Somaliland',
+  xv: 'Svalbard',
+  xz: 'Sahrawi Arab Democratic Republic (Free Zone)',
+};
+
+const WORLD_TARGET_SEARCH_ALIASES: Record<string, string[]> = {
+  ae: ['uae'],
+  cd: ['drc', 'dr congo', 'democratic republic of congo', 'congo kinshasa'],
+  cg: ['republic of congo', 'congo brazzaville'],
+  ci: ['ivory coast'],
+  cz: ['czech republic'],
+  fk: ['falklands', 'malvinas'],
+  gb: ['uk', 'u.k.', 'great britain', 'britain', 'england'],
+  mm: ['burma'],
+  mo: ['macau'],
+  ps: ['palestine'],
+  sz: ['swaziland'],
+  tl: ['east timor'],
+  tr: ['turkey'],
+  tw: ['taiwan', 'roc', 'republic of china'],
+  tz: ['tanzania'],
+  us: ['usa', 'u.s.a.'],
+  va: ['holy see'],
+  xk: ['kosova'],
+};
+
+const SUBNATIONAL_AREA_IDS = new Set([
+  'bq', 'cc', 'cnx', 'cnxx', 'cx', 'frx', 'frxx', 'gf', 'gp', 'hk', 'hm',
+  'mo', 'mq', 'nf', 'nlx', 'nlxx', 're', 'xv', 'yt',
+]);
+const SUPRANATIONAL_AREA_IDS = new Set(['eu', 'eaeu']);
+const UNPOPULATED_AREA_IDS = new Set(['antxx', 'aq', 'gs', 'io', 'noxx', 'tf']);
+const DISPUTED_SOVEREIGNTY_IDS = new Set(['tw', 'xa', 'xc', 'xd', 'xj', 'xk', 'xl', 'xn', 'xo', 'xp', 'xs', 'xz']);
+const TERRITORIAL_DISPUTE_IDS = new Set(['eh', 'xq', 'xr']);
+
+const regionDisplayNames =
+  typeof Intl !== 'undefined' && 'DisplayNames' in Intl
+    ? new Intl.DisplayNames(['en'], { type: 'region' })
+    : null;
+
+function worldTargetName(id: string): string {
+  const override = WORLD_TARGET_NAME_OVERRIDES[id];
+  if (override) return override;
+  if (/^[a-z]{2}$/.test(id)) {
+    return regionDisplayNames?.of(id.toUpperCase()) ?? id.toUpperCase();
+  }
+  return id;
+}
+
+export function normalizeMapSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function mapTargetName(target: SearchableMapTarget): string {
+  return target.name ?? target.label ?? target.id;
+}
+
+export function buildMapTargetSearchText(target: SearchableMapTarget): string {
+  return normalizeMapSearchText([
+    target.id,
+    mapTargetName(target),
+    ...(target.aliases ?? []),
+  ].join(' '));
+}
+
+export function mapTargetSearchRank(target: SearchableMapTarget, query: string): number {
+  const q = normalizeMapSearchText(query);
+  if (!q) return 0;
+  const id = normalizeMapSearchText(target.id);
+  const name = normalizeMapSearchText(mapTargetName(target));
+  const aliases = (target.aliases ?? []).map(normalizeMapSearchText);
+  const searchText = target.searchText ?? buildMapTargetSearchText(target);
+
+  if (id === q || aliases.includes(q)) return 0;
+  if (name === q) return 1;
+  if (id.startsWith(q) || aliases.some(alias => alias.startsWith(q))) return 2;
+  if (name.startsWith(q)) return 3;
+  if (searchText.includes(q)) return 4;
+  return Number.POSITIVE_INFINITY;
+}
+
+export function filterAndSortMapTargets<T extends SearchableMapTarget>(
+  targets: T[],
+  query: string,
+  isUnavailable: (target: T) => boolean = () => false,
+): T[] {
+  const q = normalizeMapSearchText(query);
+  const available = targets.filter(target =>
+    !isUnavailable(target) &&
+    (target.searchText ?? buildMapTargetSearchText(target)).includes(q)
+  );
+
+  if (!q) return available;
+
+  return available.sort((a, b) =>
+    mapTargetSearchRank(a, q) - mapTargetSearchRank(b, q) ||
+    mapTargetName(a).localeCompare(mapTargetName(b))
+  );
+}
+
+function worldTargetGroup(id: string): string {
+  if (SUPRANATIONAL_AREA_IDS.has(id)) return 'Supranational areas';
+  if (UNPOPULATED_AREA_IDS.has(id)) return 'Unpopulated areas';
+  if (DISPUTED_SOVEREIGNTY_IDS.has(id)) return 'Disputed sovereignty';
+  if (TERRITORIAL_DISPUTE_IDS.has(id)) return 'Territorial disputes';
+  if (SUBNATIONAL_AREA_IDS.has(id)) return 'Subnational areas';
+
+  const country = unCountryById(id);
+  if (country) return continentById(country.continent)?.name ?? 'Countries and states';
+  return 'Other territories';
+}
+
+const WORLD_TARGET_GROUP_ORDER: Record<string, number> = {
+  Africa: 0,
+  Asia: 1,
+  Europe: 2,
+  'North America': 3,
+  'South America': 4,
+  'Other territories': 5,
+  'Subnational areas': 6,
+  'Supranational areas': 7,
+  'Unpopulated areas': 8,
+  'Disputed sovereignty': 9,
+  'Territorial disputes': 10,
+};
+
+const OTHER_TERRITORY_ORDER: Record<string, number> = {
+  // Crown dependencies and British Overseas Territories.
+  gg: 0, im: 0, je: 0,
+  ai: 1, bm: 1, fk: 1, gi: 1, ky: 1, ms: 1, pn: 1, sh: 1, tc: 1, vg: 1,
+  // Overseas France.
+  bl: 2, mf: 2, nc: 2, pf: 2, pm: 2, wf: 2,
+  // Permanently inhabited U.S. territories.
+  as: 3, gu: 3, mp: 3, pr: 3, vi: 3,
+  // Dutch Caribbean countries.
+  aw: 4, cw: 4, sx: 4,
+  // Associated New Zealand territories.
+  ck: 5, nu: 5, tk: 5,
+  // Faroe Islands and Greenland.
+  fo: 6, gl: 6,
+  oceanxx: 99,
+};
+
+function worldTargetSortRank(target: WorldMapTarget): [number, number, string] {
+  return [
+    WORLD_TARGET_GROUP_ORDER[target.group] ?? 50,
+    target.group === 'Other territories' ? (OTHER_TERRITORY_ORDER[target.id] ?? 20) : 0,
+    target.name,
+  ];
+}
+
+function compareWorldTargets(a: WorldMapTarget, b: WorldMapTarget): number {
+  const aRank = worldTargetSortRank(a);
+  const bRank = worldTargetSortRank(b);
+
+  return (
+    aRank[0] - bRank[0] ||
+    aRank[1] - bRank[1] ||
+    aRank[2].localeCompare(bRank[2])
+  );
+}
+
+export const WORLD_MAP_TARGETS: WorldMapTarget[] = SVG_SELECTABLE_WORLD_IDS
+  .map(id => {
+    const name = worldTargetName(id);
+    const aliases = WORLD_TARGET_SEARCH_ALIASES[id] ?? [];
+    return {
+      id,
+      name,
+      aliases,
+      group: worldTargetGroup(id),
+      searchText: buildMapTargetSearchText({ id, name, aliases }),
+    };
+  })
+  .sort(compareWorldTargets);
+
 export const GROUP_COLORS: GroupColor[] = [
   { id: 'red',    value: 'oklch(0.66 0.18 25)'  },
   { id: 'orange', value: 'oklch(0.73 0.16 60)'  },
@@ -316,6 +563,10 @@ export function countryById(id: string): Country | undefined {
 
 export function unCountryById(id: string): UNCountry | undefined {
   return UN_COUNTRIES.find(c => c.id === id);
+}
+
+export function worldTargetById(id: string): WorldMapTarget | undefined {
+  return WORLD_MAP_TARGETS.find(target => target.id === id);
 }
 
 export function byContinent(continentId: string): UNCountry[] {

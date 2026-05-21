@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { colorById, gradientColorById, parseGradientNumber, scaleRange, fmtNum, unCountryById } from '../data/mapData';
+import { colorById, gradientColorById, parseGradientNumber, scaleRange, fmtNum, worldTargetById } from '../data/mapData';
 import { buildWorldMapSvg } from '../lib/svgExport';
 import { Badge } from '@/components/ui/badge';
 import type { MapMode, WorldMode, ScaleType, Group } from '../types';
@@ -33,7 +33,10 @@ export function MapPreview({
     countryId;
 
   const isGradient = mode === 'world' && worldMode === 'gradient';
-  const targetLabel = mode === 'country' ? 'regions' : 'countries';
+  const targetLabel =
+    mode === 'world' ? 'map items' :
+    mode === 'country' ? 'regions' :
+    'countries';
 
   const previewDataUrl = useMemo<string | null>(() => {
     if (mode !== 'world' || !baseSvg) return null;
@@ -175,7 +178,7 @@ function GradientLegend({ info }: {
       {entries.length > 0 && (
         <div className="border-t border-dashed border-line pt-2 grid grid-cols-2 gap-x-[18px] gap-y-1">
           {entries.slice(0, 6).map(e => {
-            const c = unCountryById(e.id);
+            const c = worldTargetById(e.id);
             return (
               <div key={e.id} className="flex justify-between gap-2 text-[12px]">
                 <span className="text-ink-2 overflow-hidden text-ellipsis whitespace-nowrap">{c ? c.name : e.id}</span>
