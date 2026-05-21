@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { colorById, gradientColorById, scaleRange, fmtNum, unCountryById } from '../data/mapData';
+import { colorById, gradientColorById, parseGradientNumber, scaleRange, fmtNum, unCountryById } from '../data/mapData';
 import { buildWorldMapSvg } from '../lib/svgExport';
+import { Badge } from '@/components/ui/badge';
 import type { MapMode, WorldMode, ScaleType, Group } from '../types';
 
 interface Props {
@@ -26,11 +27,6 @@ export function MapPreview({
   worldMode, gradientValues, scaleType, customMin, customMax,
   startColorId, endColorId, baseSvg, includeOverlay,
 }: Props) {
-  const subject =
-    mode === 'world' ? 'World' :
-    mode === 'continent' ? continentId :
-    countryId;
-
   const subjectLabel =
     mode === 'world' ? 'World' :
     mode === 'continent' ? continentId :
@@ -39,143 +35,100 @@ export function MapPreview({
   const isGradient = mode === 'world' && worldMode === 'gradient';
   const targetLabel = mode === 'country' ? 'regions' : 'countries';
 
-  // Build a data URL for the live map preview — mirrors the export toggle
-  // so what you see in the preview matches what you download.
   const previewDataUrl = useMemo<string | null>(() => {
     if (mode !== 'world' || !baseSvg) return null;
     try {
       const svg = buildWorldMapSvg(baseSvg, {
         title, caption, groups, worldMode,
         gradientValues, scaleType, customMin, customMax,
-        startColorId, endColorId,
-        includeOverlay,
+        startColorId, endColorId, includeOverlay,
       });
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }, [baseSvg, mode, title, caption, groups, worldMode, gradientValues,
       scaleType, customMin, customMax, startColorId, endColorId, includeOverlay]);
-  const totalMembers = groups.reduce((n, g) => n + g.members.length, 0);
 
   let gradientInfo: {
     entries: { id: string; v: number }[];
     range: [number, number];
     startColor: string;
     endColor: string;
-    scaleType: ScaleType;
   } | null = null;
 
   if (isGradient) {
     const entries = Object.entries(gradientValues)
-      .map(([id, v]) => ({ id, v: Number(v) }))
-      .filter(({ v }) => Number.isFinite(v));
+      .map(([id, value]) => ({ id, v: parseGradientNumber(value) }))
+      .filter((entry): entry is { id: string; v: number } => entry.v !== null);
     const vals = entries.map(e => e.v);
     const dataMin = vals.length ? Math.min(...vals) : 0;
     const dataMax = vals.length ? Math.max(...vals) : 0;
-    const range = scaleRange(scaleType, dataMin, dataMax, customMin, customMax);
     gradientInfo = {
-      entries,
-      range,
+      entries, range: scaleRange(scaleType, dataMin, dataMax, customMin, customMax),
       startColor: gradientColorById(startColorId),
       endColor: gradientColorById(endColorId),
-      scaleType,
     };
   }
 
   return (
-    <div className="preview-doc">
-      <header className="preview-doc-head">
-        <div className="preview-eyebrow">
+    <div className="w-full max-w-[820px] flex flex-col gap-4">
+      {/* Header */}
+      <header>
+        <div className="flex gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
           <span>{mode === 'world' ? 'World map' : mode === 'continent' ? 'Continent map' : 'Country map'}</span>
-          <span className="dot">·</span>
+          <span className="opacity-50">·</span>
           <span>{subjectLabel}</span>
         </div>
-        <h2 className="preview-doc-title">{title || subjectLabel}</h2>
-        {caption && <p className="preview-doc-caption">{caption}</p>}
+        <h2 className="font-serif text-[30px] font-semibold tracking-[-0.015em] leading-[1.1] mt-1.5">
+          {title || subjectLabel}
+        </h2>
+        {caption && (
+          <p className="font-serif text-[14.5px] leading-[1.5] text-ink-2 italic mt-2 max-w-[64ch]">{caption}</p>
+        )}
       </header>
 
+      {/* Frame */}
       <div className="preview-frame">
-        {/* Background layer — map image or placeholder */}
         {previewDataUrl ? (
-          <img
-            src={previewDataUrl}
-            alt={title || 'World map preview'}
-            className="preview-map-img"
-          />
+          <img src={previewDataUrl} alt={title || 'World map preview'} className="preview-map-img" />
         ) : (
           <div className="preview-blank">
             {mode === 'world' && !baseSvg ? (
-              <div className="preview-blank-title">Loading map…</div>
+              <div className="font-serif text-[16px] text-ink-2 font-semibold">Loading map…</div>
             ) : (
               <>
                 <BlankGlyph />
-                <div className="preview-blank-title">Map preview</div>
-                <div className="preview-blank-sub">
+                <div className="font-serif text-[16px] text-ink-2 font-semibold">Map preview</div>
+                <div className="text-[12.5px] max-w-[32ch] leading-[1.5]">
                   The SVG will be generated from your configuration.
                 </div>
               </>
             )}
           </div>
         )}
-
-        {/* Foreground layers — rendered after img so they paint on top */}
-        <div className="preview-frame-corners">
-          <span /><span /><span /><span />
-        </div>
-
-        <div className="preview-meta">
-          <div className="meta-row">
-            <span className="meta-key">Subject</span>
-            <span className="meta-val">{subjectLabel}</span>
-          </div>
-          {isGradient && gradientInfo ? (
-            <>
-              <div className="meta-row">
-                <span className="meta-key">Data points</span>
-                <span className="meta-val">{gradientInfo.entries.length}</span>
-              </div>
-              <div className="meta-row">
-                <span className="meta-key">Scale</span>
-                <span className="meta-val">{scaleTypeLabel(scaleType)}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="meta-row">
-                <span className="meta-key">Groups</span>
-                <span className="meta-val">{groups.length}</span>
-              </div>
-              <div className="meta-row">
-                <span className="meta-key">{targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)}</span>
-                <span className="meta-val">{totalMembers} assigned</span>
-              </div>
-            </>
-          )}
-          <div className="meta-row">
-            <span className="meta-key">Format</span>
-            <span className="meta-val">SVG · vector</span>
-          </div>
-        </div>
+        <div className="preview-frame-corners"><span /><span /><span /><span /></div>
       </div>
 
+      {/* Legend */}
       {isGradient && gradientInfo ? (
         <GradientLegend info={gradientInfo} />
       ) : groups.length > 0 ? (
-        <div className="preview-legend">
-          <div className="preview-legend-head">Legend</div>
-          <ul className="legend-list">
+        <div className="bg-paper border border-line rounded-[8px] px-[18px] py-3.5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 mb-2">Legend</div>
+          <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
             {groups.map(g => (
-              <li key={g.id} className="legend-item">
-                <span className="legend-chip" style={{ background: colorById(g.colorId) }} />
-                <span className="legend-name">{g.name}</span>
-                <span className="legend-count">{g.members.length} {targetLabel}</span>
+              <li key={g.id} className="flex items-center gap-2.5 text-[13px]">
+                <span className="w-3.5 h-3.5 rounded-[3px] border border-[oklch(0.2_0.01_240/0.18)] shrink-0"
+                  style={{ background: colorById(g.colorId) }} />
+                <span className="flex-1 font-medium">{g.name}</span>
+                <span className="font-mono text-[10.5px] text-ink-3 tracking-[0.04em]">
+                  {g.members.length} {targetLabel}
+                </span>
               </li>
             ))}
           </ul>
         </div>
       ) : (
-        <div className="preview-legend preview-legend-empty">
+        <div className="bg-paper border border-line rounded-[8px] px-[18px] py-3.5 italic text-ink-3 text-[13px] text-center">
           No groups yet — create one in the configuration panel to colour the map.
         </div>
       )}
@@ -185,7 +138,7 @@ export function MapPreview({
 
 function BlankGlyph() {
   return (
-    <svg width="78" height="78" viewBox="0 0 78 78" aria-hidden="true" className="blank-glyph">
+    <svg width="78" height="78" viewBox="0 0 78 78" aria-hidden="true" className="text-ink-3 mb-1">
       <defs>
         <pattern id="bgDots" patternUnits="userSpaceOnUse" width="6" height="6">
           <circle cx="1.2" cy="1.2" r="0.7" fill="currentColor" opacity="0.18" />
@@ -202,51 +155,36 @@ function BlankGlyph() {
   );
 }
 
-function scaleTypeLabel(t: ScaleType): string {
-  if (t === '0-100') return '0 – 100';
-  if (t === 'custom') return 'Custom';
-  return 'From data';
-}
-
 function GradientLegend({ info }: {
-  info: {
-    range: [number, number];
-    startColor: string;
-    endColor: string;
-    entries: { id: string; v: number }[];
-  };
+  info: { range: [number, number]; startColor: string; endColor: string; entries: { id: string; v: number }[] };
 }) {
   const { range, startColor, endColor, entries } = info;
   return (
-    <div className="preview-legend gradient-legend">
-      <div className="preview-legend-head">
+    <div className="bg-paper border border-line rounded-[8px] px-[18px] py-3.5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 mb-2 flex items-center justify-between">
         <span>Gradient legend</span>
-        <span className="legend-count-pill">
-          {entries.length} {entries.length === 1 ? 'value' : 'values'}
-        </span>
+        <Badge variant="pill">{entries.length} {entries.length === 1 ? 'value' : 'values'}</Badge>
       </div>
-      <div
-        className="legend-gradient-bar"
-        style={{ background: `linear-gradient(to right, ${startColor}, ${endColor})` }}
-      />
-      <div className="legend-gradient-ticks">
+      <div className="h-4 rounded-[4px] border border-line mb-1"
+        style={{ background: `linear-gradient(to right, ${startColor}, ${endColor})` }} />
+      <div className="flex justify-between font-mono text-[10.5px] text-ink-3 tracking-[0.02em] mb-2.5">
         <span>{fmtNum(range[0])}</span>
         <span>{fmtNum((range[0] + range[1]) / 2)}</span>
         <span>{fmtNum(range[1])}</span>
       </div>
       {entries.length > 0 && (
-        <div className="legend-data-preview">
+        <div className="border-t border-dashed border-line pt-2 grid grid-cols-2 gap-x-[18px] gap-y-1">
           {entries.slice(0, 6).map(e => {
             const c = unCountryById(e.id);
             return (
-              <div key={e.id} className="legend-data-row">
-                <span className="legend-data-name">{c ? c.name : e.id}</span>
-                <span className="legend-data-val">{fmtNum(e.v)}</span>
+              <div key={e.id} className="flex justify-between gap-2 text-[12px]">
+                <span className="text-ink-2 overflow-hidden text-ellipsis whitespace-nowrap">{c ? c.name : e.id}</span>
+                <span className="font-mono text-[11.5px] text-ink font-medium">{fmtNum(e.v)}</span>
               </div>
             );
           })}
           {entries.length > 6 && (
-            <div className="legend-data-more">+ {entries.length - 6} more…</div>
+            <div className="col-span-2 text-[11.5px] text-ink-3 italic mt-1">+ {entries.length - 6} more…</div>
           )}
         </div>
       )}

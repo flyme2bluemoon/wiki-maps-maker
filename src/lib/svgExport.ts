@@ -1,6 +1,6 @@
 import type { Group } from '../types';
 import type { ScaleType } from '../types';
-import { colorById, gradientColorById, scaleRange } from '../data/mapData';
+import { colorById, gradientColorById, parseGradientNumber, scaleRange } from '../data/mapData';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -258,8 +258,6 @@ function buildGroupsLegend(groups: Group[]): string {
 /** SVG legend for gradient mode — colour bar + tick labels, bottom-left. */
 function buildGradientLegend(
   range: [number, number],
-  startColor: string,
-  endColor: string,
   gradientDefId: string,
 ): string {
   const [lo, hi] = range;
@@ -305,14 +303,14 @@ export function buildWorldMapSvg(baseSvg: string, opts: BuildOpts): string {
     startColorId, endColorId, includeOverlay,
   } = opts;
 
-  let css = '';
+  let css: string;
   let extraDefs = '';
   let legendOverlay = '';
 
   if (worldMode === 'gradient') {
     const entries = Object.entries(gradientValues)
-      .map(([id, v]) => ({ id, v: Number(v) }))
-      .filter(({ v }) => Number.isFinite(v));
+      .map(([id, value]) => ({ id, v: parseGradientNumber(value) }))
+      .filter((entry): entry is { id: string; v: number } => entry.v !== null);
     const vals = entries.map(e => e.v);
     const dataMin = vals.length ? Math.min(...vals) : 0;
     const dataMax = vals.length ? Math.max(...vals) : 0;
@@ -330,7 +328,7 @@ export function buildWorldMapSvg(baseSvg: string, opts: BuildOpts): string {
         `<stop offset="1" stop-color="${endColor}"/>` +
         `</linearGradient>` +
         `</defs>`;
-      legendOverlay = buildGradientLegend(range, startColor, endColor, gradDefId);
+      legendOverlay = buildGradientLegend(range, gradDefId);
     }
   } else {
     const { defs, css: groupCss } = buildGroupResult(groups);

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { TopNav } from './components/TopNav';
 import { ConfigPanel } from './components/ConfigPanel';
 import { MapPreview } from './components/MapPreview';
-import { continentById, countryById, colorById, gradientColorById, scaleRange } from './data/mapData';
+import { continentById, countryById, colorById, gradientColorById, parseGradientNumber, scaleRange } from './data/mapData';
 import { loadWorldSvg, buildWorldMapSvg } from './lib/svgExport';
 import type { MapMode, WorldMode, ScaleType, Group, DocState } from './types';
 
@@ -86,7 +86,7 @@ export default function App() {
   }
 
   const crumbs =
-    mode === 'world' ? ['Preview', 'World' + (worldMode === 'gradient' ? ' · Gradient' : '')] :
+    mode === 'world' ? ['Preview', 'World'] :
     mode === 'continent' ? ['Preview', continentById(continentId)?.name ?? '—'] :
     ['Preview', countryById(countryId)?.name ?? '—'];
 
@@ -118,19 +118,19 @@ export default function App() {
           includeOverlay={includeOverlay} setIncludeOverlay={setIncludeOverlay}
         />
 
-        <main className="preview">
-          <div className="preview-toolbar">
-            <div className="crumbs">
+        <main className="bg-canvas flex flex-col min-w-0 min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-2.5 border-b border-line bg-paper shrink-0">
+            <div className="flex items-center gap-2 text-[12.5px] text-ink-3">
               {crumbs.map((c, i) => (
                 <span key={i} style={{ display: 'contents' }}>
-                  {i > 0 && <span className="crumb-sep">/</span>}
-                  <span className={`crumb ${i === crumbs.length - 1 ? 'is-last' : ''}`}>{c}</span>
+                  {i > 0 && <span className="text-line-2">/</span>}
+                  <span className={i === crumbs.length - 1 ? 'text-ink font-medium' : ''}>{c}</span>
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="preview-stage">
+          <div className="flex-1 overflow-auto flex items-start justify-center p-8 min-h-0">
             <MapPreview
               mode={mode}
               continentId={continentId}
@@ -175,14 +175,14 @@ function buildSvg(opts: {
     (countryById(countryId)?.name ?? '');
 
   const isGradient = mode === 'world' && worldMode === 'gradient';
-  let legendG = '';
-  let metadataInner = '';
+  let legendG: string;
+  let metadataInner: string;
   let defsBlock = '';
 
   if (isGradient) {
     const entries = Object.entries(gradientValues)
-      .map(([id, v]) => ({ id, v: Number(v) }))
-      .filter(({ v }) => Number.isFinite(v));
+      .map(([id, value]) => ({ id, v: parseGradientNumber(value) }))
+      .filter((entry): entry is { id: string; v: number } => entry.v !== null);
     const vals = entries.map(e => e.v);
     const dataMin = vals.length ? Math.min(...vals) : 0;
     const dataMax = vals.length ? Math.max(...vals) : 0;

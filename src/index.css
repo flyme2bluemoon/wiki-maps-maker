@@ -1,2 +1,19 @@
 @import "tailwindcss";
 @import "./styles/wiki-map.css";
+
+@theme {
+  --color-ink:         oklch(0.18 0.01 240);
+  --color-ink-2:       oklch(0.36 0.01 240);
+  --color-ink-3:       oklch(0.55 0.01 240);
+  --color-ink-4:       oklch(0.72 0.005 240);
+  --color-paper:       oklch(0.995 0.003 80);
+  --color-panel:       oklch(0.985 0.004 80);
+  --color-canvas:      oklch(0.965 0.006 80);
+  --color-line:        oklch(0.90 0.008 240);
+  --color-line-2:      oklch(0.82 0.01 240);
+  --color-accent:      oklch(0.50 0.16 250);
+  --color-accent-soft: oklch(0.94 0.04 250);
+  --font-family-sans:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-serif: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+  --font-family-mono:  'JetBrains Mono', ui-monospace, Menlo, monospace;
+}

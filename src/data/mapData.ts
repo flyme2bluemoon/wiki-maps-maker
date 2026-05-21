@@ -343,6 +343,18 @@ export function scaleRange(
   return [dataMin, dataMax];
 }
 
+export function parseGradientNumber(value: number | string): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed === '-' || trimmed === '.' || trimmed === '-.') {
+    return null;
+  }
+
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function fmtNum(n: number): string {
   if (!Number.isFinite(n)) return '—';
   const r = Math.round(n * 100) / 100;

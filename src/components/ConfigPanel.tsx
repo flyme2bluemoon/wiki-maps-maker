@@ -1,15 +1,16 @@
 import { useMemo } from 'react';
 import {
-  UN_COUNTRIES,
-  SUBDIVISIONS,
-  GROUP_COLORS,
-  byContinent,
-  countryById,
-  continentById,
-  colorById,
+  UN_COUNTRIES, SUBDIVISIONS, GROUP_COLORS,
+  byContinent, countryById, continentById,
 } from '../data/mapData';
 import { GroupCard } from './GroupCard';
 import { GradientConfig } from './GradientConfig';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import type { MapMode, WorldMode, ScaleType, Group } from '../types';
 
 interface Props {
@@ -44,25 +45,20 @@ interface Props {
 export function ConfigPanel(props: Props) {
   const {
     mode, continentId, countryId,
-    title, setTitle,
-    caption, setCaption,
-    groups, setGroups,
-    onExportSvg,
+    title, setTitle, caption, setCaption,
+    groups, setGroups, onExportSvg,
     includeOverlay, setIncludeOverlay,
     worldMode, setWorldMode,
     gradientValues, setGradientValues,
     scaleType, setScaleType,
-    customMin, setCustomMin,
-    customMax, setCustomMax,
-    startColorId, setStartColorId,
-    endColorId, setEndColorId,
+    customMin, setCustomMin, customMax, setCustomMax,
+    startColorId, setStartColorId, endColorId, setEndColorId,
   } = props;
 
   const targets = useMemo(() => {
     if (mode === 'world') {
       return UN_COUNTRIES.map(c => ({
-        id: c.id,
-        label: c.name,
+        id: c.id, label: c.name,
         sub: continentById(c.continent)?.name ?? '—',
       }));
     } else if (mode === 'continent') {
@@ -81,32 +77,24 @@ export function ConfigPanel(props: Props) {
     const free = GROUP_COLORS.find(c => !used.has(c.id));
     return (free ?? GROUP_COLORS[groups.length % GROUP_COLORS.length]).id;
   }
-
   function addGroup() {
-    const n = groups.length + 1;
     const g: Group = {
       id: 'g-' + Math.random().toString(36).slice(2, 8),
-      name: `Group ${n}`,
+      name: `Group ${groups.length + 1}`,
       colorId: nextColorId(),
       members: [],
     };
     setGroups([...groups, g]);
   }
-
   function updateGroup(id: string, patch: Partial<Group>) {
     setGroups(groups.map(g => g.id === id ? { ...g, ...patch } : g));
   }
-
-  function deleteGroup(id: string) {
-    setGroups(groups.filter(g => g.id !== id));
-  }
-
+  function deleteGroup(id: string) { setGroups(groups.filter(g => g.id !== id)); }
   function addMember(groupId: string, memberId: string) {
     const g = groups.find(x => x.id === groupId);
     if (!g || g.members.includes(memberId)) return;
     updateGroup(groupId, { members: [...g.members, memberId] });
   }
-
   function removeMember(groupId: string, memberId: string) {
     const g = groups.find(x => x.id === groupId);
     if (!g) return;
@@ -122,59 +110,80 @@ export function ConfigPanel(props: Props) {
 
   return (
     <aside className="config-panel">
-      <div className="config-header">
-        <div className="config-eyebrow">Configuration</div>
-        <h2 className="config-h2">{modeTitle}</h2>
+      {/* Sticky header */}
+      <div className="px-6 pt-5 pb-4 border-b border-line sticky top-0 bg-paper z-[2]">
+        <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">Configuration</div>
+        <h2 className="font-serif text-[22px] font-semibold mt-1 tracking-[-0.01em]">{modeTitle}</h2>
       </div>
 
+      {/* Document */}
       <Section title="Document" num="01">
         <Field label="Title">
-          <input
-            className="ip-text"
+          <Input
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Map title"
           />
         </Field>
         <Field label="Caption (optional)">
-          <textarea
-            className="ip-text ip-textarea"
+          <Textarea
             value={caption}
             onChange={e => setCaption(e.target.value)}
             rows={2}
             placeholder="Caption embedded as <desc> in the SVG"
           />
         </Field>
+        {mode === 'world' && (
+          <label className="flex items-center gap-2.5 cursor-pointer mt-1">
+            <Switch
+              checked={includeOverlay}
+              onCheckedChange={setIncludeOverlay}
+            />
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-3">
+              Include title &amp; legend overlay
+            </span>
+          </label>
+        )}
       </Section>
 
+      {/* Mode switch (world only) */}
       {mode === 'world' && (
-        <div className="cfg-section-mode">
-          <div className="mode-switch">
+        <div className="px-6 py-3.5 border-b border-line">
+          <div className="flex gap-1 p-[3px] bg-canvas border border-line rounded-[9px]">
             <button
-              className={`mode-tab ${worldMode === 'groups' ? 'is-active' : ''}`}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 px-2.5 py-[7px] rounded-[6px] text-[12.5px] font-medium transition-all",
+                worldMode === 'groups'
+                  ? "bg-paper text-ink [box-shadow:0_1px_2px_oklch(0.2_0.02_240_/_0.10)]"
+                  : "text-ink-3 hover:text-ink"
+              )}
               onClick={() => setWorldMode('groups')}
             >
-              <span className="mode-tab-glyph">⬡</span>
+              <span className={cn("text-[13px]", worldMode === 'groups' ? "opacity-100" : "opacity-70")}>⬡</span>
               <span>Groups</span>
             </button>
             <button
-              className={`mode-tab ${worldMode === 'gradient' ? 'is-active' : ''}`}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 px-2.5 py-[7px] rounded-[6px] text-[12.5px] font-medium transition-all",
+                worldMode === 'gradient'
+                  ? "bg-paper text-ink [box-shadow:0_1px_2px_oklch(0.2_0.02_240_/_0.10)]"
+                  : "text-ink-3 hover:text-ink"
+              )}
               onClick={() => setWorldMode('gradient')}
             >
-              <span className="mode-tab-glyph">▦</span>
+              <span className={cn("text-[13px]", worldMode === 'gradient' ? "opacity-100" : "opacity-70")}>▦</span>
               <span>Gradient</span>
             </button>
           </div>
         </div>
       )}
 
+      {/* Groups or Gradient */}
       {isGradient ? (
         <Section title="Gradient" num="02">
           <GradientConfig
-            values={gradientValues}
-            setValues={setGradientValues}
-            scaleType={scaleType}
-            setScaleType={setScaleType}
+            values={gradientValues} setValues={setGradientValues}
+            scaleType={scaleType} setScaleType={setScaleType}
             customMin={customMin} setCustomMin={setCustomMin}
             customMax={customMax} setCustomMax={setCustomMax}
             startColorId={startColorId} setStartColorId={setStartColorId}
@@ -184,26 +193,17 @@ export function ConfigPanel(props: Props) {
       ) : (
         <Section title="Groups" num="02">
           {groups.length === 0 ? (
-            <div className="empty-card">
-              <div className="empty-icon">⬡</div>
-              <div className="empty-title">No groups yet</div>
-              <div className="empty-sub">
-                Groups let you colour {targetNoun} together — e.g. EU member states, OECD, BRICS.
-                A {targetNounSingular} can belong to more than one group.
-              </div>
-              <button className="btn btn-primary" onClick={addGroup}>
-                + Create your first group
-              </button>
+            <div className="border border-dashed border-line-2 rounded-[12px] px-5 py-6 text-center flex flex-col items-center gap-2.5 bg-gradient-to-b from-panel to-canvas">
+              <div className="text-[28px] leading-none text-ink-3 mb-0.5">⬡</div>
+              <div className="font-serif text-[15px] font-semibold">No groups yet</div>
+              <Button variant="default" onClick={addGroup}>+ Create your first group</Button>
             </div>
           ) : (
-            <div className="group-list">
+            <div className="flex flex-col gap-3">
               {groups.map(g => (
                 <GroupCard
-                  key={g.id}
-                  group={g}
-                  targets={targets}
-                  targetNoun={targetNoun}
-                  targetNounSingular={targetNounSingular}
+                  key={g.id} group={g} targets={targets}
+                  targetNoun={targetNoun} targetNounSingular={targetNounSingular}
                   onRename={name => updateGroup(g.id, { name })}
                   onSetColor={colorId => updateGroup(g.id, { colorId })}
                   onDelete={() => deleteGroup(g.id)}
@@ -211,55 +211,40 @@ export function ConfigPanel(props: Props) {
                   onRemoveMember={id => removeMember(g.id, id)}
                 />
               ))}
-              <button className="btn btn-block btn-ghost" onClick={addGroup}>
-                + Add group
-              </button>
+              <Button variant="ghost" className="w-full" onClick={addGroup}>+ Add group</Button>
             </div>
           )}
         </Section>
       )}
 
+      {/* Export */}
       <Section title="Export" num="03">
-        {mode === 'world' && (
-          <label className="field field-inline">
-            <input
-              type="checkbox"
-              checked={includeOverlay}
-              onChange={e => setIncludeOverlay(e.target.checked)}
-            />
-            <span className="field-label">Include title &amp; legend overlay</span>
-          </label>
-        )}
-        <button className="btn btn-primary btn-block" onClick={onExportSvg}>
-          <span className="btn-icon">↓</span>
+        <Button variant="default" className="w-full" onClick={onExportSvg}>
+          <span className="text-[14px] leading-none">↓</span>
           <span>Download SVG</span>
-        </button>
+        </Button>
       </Section>
     </aside>
   );
 }
 
-function Section({ title, num, children }: {
-  title: string;
-  num: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, num, children }: { title: string; num: string; children: React.ReactNode }) {
   return (
-    <section className="cfg-section">
-      <header className="cfg-section-head">
-        <span className="cfg-num">{num}</span>
-        <h3 className="cfg-title">{title}</h3>
-        <span className="cfg-rule" />
+    <section className="px-6 pt-[18px] pb-[22px] border-b border-line last:border-b-0">
+      <header className="flex items-center gap-2.5 mb-3.5">
+        <span className="font-mono text-[10px] text-ink-3 tracking-[0.06em]">{num}</span>
+        <h3 className="font-serif text-[14px] font-semibold tracking-[-0.005em]">{title}</h3>
+        <Separator className="flex-1" />
       </header>
-      <div className="cfg-body">{children}</div>
+      <div className="flex flex-col gap-2.5">{children}</div>
     </section>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
+    <label className="flex flex-col gap-[5px]">
+      <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-3">{label}</span>
       {children}
     </label>
   );
